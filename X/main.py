@@ -16,6 +16,9 @@ if __name__ == "__main__":
 
     test_file = read_str("input.txt")
 
+    print("Part 1 (test):", part1(part1_test))
+    print("Part 2 (test):", part2(part2_test))
+
     # assert part1(part1_test)
     # assert part2(part2_test)
 
