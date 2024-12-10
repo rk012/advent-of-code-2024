@@ -7,13 +7,13 @@ def lines(x):
     return x.split('\n')
 
 
-def cgrid(x):
+def cgrid(x, fn=lambda x: x):
     grid = []
 
     for row in lines(x):
         r = []
         for c in row:
-            r.append(c)
-        grid.append(row)
+            r.append(fn(c))
+        grid.append(r)
 
     return grid
