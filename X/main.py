@@ -23,7 +23,6 @@ if __name__ == "__main__":
 
     print("Part 1:", part1(test_file))
 
-
     p2_tst = part2(part2_test)
     print("Part 2 (test):", part2(part2_test))
 
