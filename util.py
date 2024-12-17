@@ -1,4 +1,5 @@
 import itertools
+import re
 from collections import deque
 from heapq import heappush, heappop
 from typing import Any, Iterator, Callable
@@ -15,6 +16,10 @@ def read_str(fname: str) -> str:
 
 def lines(x: str) -> list[str]:
     return x.split('\n')
+
+
+def read_ints(s: str) -> Iterable[int]:
+    return map(int, re.findall(r"-?\d+", s))
 
 
 # Grid

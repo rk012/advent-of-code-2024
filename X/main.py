@@ -19,13 +19,13 @@ if __name__ == "__main__":
     p1_tst = part1(part1_test)
     print("Part 1 (test):", p1_tst)
 
-    # assert part1(part1_test) ==
+    # assert p1_tst ==
 
     print("Part 1:", part1(test_file))
 
     p2_tst = part2(part2_test)
-    print("Part 2 (test):", part2(part2_test))
+    print("Part 2 (test):", p2_tst)
 
-    # assert part2(part2_test) ==
+    # assert p2_tst ==
 
     print("Part 2:", part2(test_file))
