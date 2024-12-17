@@ -1,5 +1,7 @@
 import itertools
-from typing import Any, Iterable, Optional, Generic, Iterator
+from collections import deque
+from heapq import heappush, heappop
+from typing import Any, Iterator, Callable
 
 from type_defs import *
 
@@ -370,3 +372,192 @@ class BST(Iterable[Cmp]):
 
     def __len__(self) -> int:
         return len(self.root)
+
+
+# Graphs
+
+class Graph(ImplGraph[T]):
+    def __init__(self, v: Optional[Iterable[T]] = None, directed=False):
+        self._dir = directed
+        self._nbors: dict[T, set[tuple[T, Cmp]]] = dict()
+        self.edges: dict[tuple[T, T], Cmp] = dict()
+
+        if v is not None:
+            for x in v:
+                self.add_vert(x)
+
+    @property
+    def directed(self) -> bool:
+        return self._dir
+
+    def nbors(self, v: T) -> Iterable[tuple[T, Cmp]]:
+        return self._nbors[v]
+
+    def add_vert(self, v: T):
+        if v in self._nbors:
+            self._nbors[v] = set()
+
+    def add_edge(self, u: T, v: T, w: Cmp = 1):
+        assert u in self._nbors
+        assert v in self._nbors
+        self.edges[(u, v)] = w
+        self._nbors[u].add((v, w))
+        if not self.directed:
+            self.edges[(v, u)] = w
+            self._nbors[v].add((u, w))
+
+    def get_edge(self, u: T, v: T) -> Optional[Cmp]:
+        return None if (u, v) not in self.edges else self.edges[(u, v)]
+
+    def kruskals(self) -> "Graph[T]":
+        assert not self.directed
+        edges = []
+        mst = Graph(self._nbors.keys())
+        uf = UF(self._nbors.keys())
+
+        for (u, v), w in self.edges.items():
+            heappush(edges, (w, u, v))
+
+        while edges:
+            _, u, v = heappop(edges)
+            if not uf.equiv(u, v):
+                uf.union(u, v)
+                mst.add_edge(u, v)
+
+        return mst
+
+    def components(self) -> Iterable[set[T]]:
+        assert not self.directed
+        uf = UF(self._nbors.keys())
+
+        for u, v in self.edges.keys():
+            uf.union(u, v)
+
+        return uf.groups.values()
+
+
+class Path(Iterable[T]):
+    def __init__(self, x: T, base: Optional["Path[T]"] = None):
+        self.base = base
+        self.x = x
+
+    def __add__(self, other: T) -> "Path[T]":
+        return Path(other, self)
+
+    def __iter__(self):
+        q = deque()
+        p = self
+        while p is not None:
+            q.appendleft(p.x)
+            p = p.base
+        return iter(q)
+
+
+class KeyCmp(Cmp, Generic[T]):
+    def __init__(self, k: Cmp, v: T):
+        self.k = k
+        self.v = v
+        self.__eq__ = k.__eq__
+        self.__lt__ = k.__lt__
+
+    def __eq__(self, other):
+        if not isinstance(other, KeyCmp):
+            return NotImplemented
+        return self.k == other.k
+
+    def __lt__(self, other):
+        if not isinstance(other, KeyCmp):
+            return NotImplemented
+        return self.k < other.k
+
+    def __getitem__(self, i) -> Cmp | T:
+        if i == 0:
+            return self.k
+        elif i == 1:
+            return self.v
+        else:
+            raise IndexError()
+
+
+class ShortestPath(Traversal[T, Optional[tuple[Path[T], float]], KeyCmp[tuple[Path[T], T]]]):
+    def __init__(self, targets: Iterable[T], heuristic: Callable[[T], float] = lambda _: 0):
+        super().__init__()
+        self.targets = set(targets)
+        self.visited = set()
+        self.heuristic = heuristic
+
+    def start(self, v: T) -> KeyCmp[tuple[Path[T], T]]:
+        return KeyCmp((0, 0), (Path(v), v))
+
+    def visit(self, ctx: KeyCmp[tuple[Path[T], T]]) -> bool:
+        (c, _), (p, v) = ctx
+        if v in self.targets:
+            self.result = p, c
+            return False
+        if v in self.visited:
+            return False
+        self.visited.add(v)
+        return True
+
+    def nbor(self, cur: KeyCmp[tuple[Path[T], T]], nxt: T, w: float) -> Optional[KeyCmp[tuple[Path[T], T]]]:
+        (c, h0), (p, v) = cur
+        c -= h0
+        c += w
+        h = self.heuristic(nxt)
+        return KeyCmp((c+h, h), (p+nxt, nxt))
+
+    def end(self) -> Optional[Path[T]]:
+        return None
+
+
+def search(g: ImplGraph[T], t: Traversal[T, R, C], start: T, single_visit: bool = True, dfs: bool = False) -> R:
+    q = deque([(start, t.start(start))])
+    visited = set()
+
+    while q:
+        if t.result is not None:
+            return t.result
+
+        if dfs:
+            cur, ctx = q.pop()
+        else:
+            cur, ctx = q.popleft()
+
+        if single_visit and cur in visited:
+            continue
+        visited.add(cur)
+
+        if not t.visit(ctx):
+            continue
+
+        for nxt, w in g.nbors(cur):
+            new_ctx = t.nbor(ctx, nxt, w)
+            if new_ctx is not None:
+                q.append((nxt, new_ctx))
+
+    return t.end()
+
+
+def astar(g: ImplGraph[T], t: Traversal[T, R, C], start: T, single_visit: bool = True) -> R:
+    pq = [KeyCmp(t.start(start), start)]
+    visited = set()
+
+    while pq:
+        if t.result is not None:
+            return t.result
+
+        ctx, cur = heappop(pq)
+
+        if single_visit and cur in visited:
+            continue
+        visited.add(cur)
+
+        if not t.visit(ctx):
+            continue
+
+        for nxt, w in g.nbors(cur):
+            new_ctx = t.nbor(ctx, nxt, w)
+            if new_ctx is not None:
+                heappush(pq, KeyCmp(new_ctx, nxt))
+
+    return t.end()
