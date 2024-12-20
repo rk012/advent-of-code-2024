@@ -1,6 +1,6 @@
 import itertools
 import re
-from collections import deque
+from collections import deque, defaultdict
 from heapq import heappush, heappop
 from typing import Any, Iterator, Callable
 
@@ -398,8 +398,12 @@ class Graph(ImplGraph[T]):
     def nbors(self, v: T) -> Iterable[tuple[T, Cmp]]:
         return self._nbors[v]
 
+    @property
+    def vertices(self) -> Iterable[T]:
+        return self._nbors.keys()
+
     def add_vert(self, v: T):
-        if v in self._nbors:
+        if v not in self._nbors:
             self._nbors[v] = set()
 
     def add_edge(self, u: T, v: T, w: Cmp = 1):
@@ -410,6 +414,15 @@ class Graph(ImplGraph[T]):
         if not self.directed:
             self.edges[(v, u)] = w
             self._nbors[v].add((u, w))
+
+    def del_edge(self, u: T, v: T):
+        assert u in self._nbors
+        assert v in self._nbors
+        del self.edges[(u, v)]
+        self._nbors[u] = set(filter(lambda x: x[0] != v, self._nbors[u]))
+        if not self.directed:
+            del self.edges[(v, u)]
+            self._nbors[v] = set(filter(lambda x: x[0] != u, self._nbors[v]))
 
     def get_edge(self, u: T, v: T) -> Optional[Cmp]:
         return None if (u, v) not in self.edges else self.edges[(u, v)]
@@ -566,3 +579,64 @@ def astar(g: ImplGraph[T], t: Traversal[T, R, C], start: T, single_visit: bool =
                 heappush(pq, KeyCmp(new_ctx, nxt))
 
     return t.end()
+
+
+def build_graph(g: ImplGraph[T], *roots: T):
+    res = Graph(directed=g.directed)
+    q = deque(roots)
+    visited = set()
+
+    while q:
+        u = q.popleft()
+        if u in visited:
+            continue
+        visited.add(u)
+        res.add_vert(u)
+        for v, w in g.nbors(u):
+            q.append(v)
+            res.add_vert(v)
+            res.add_edge(u, v, w)
+
+    return res
+
+
+def topsort(g: Graph[T]) -> list[T]:
+    assert g.directed
+    counts = defaultdict(lambda: 0)
+    verts = set(g.vertices)
+
+    for v in verts:
+        for u, _ in g.nbors(v):
+            counts[u] += 1
+
+    q = deque([v for v in verts if counts[v] == 0])
+    res = []
+
+    while q:
+        v = q.popleft()
+        res.append(v)
+
+        for u, _ in g.nbors(v):
+            counts[u] -= 1
+            if counts[u] == 0:
+                q.append(u)
+
+    assert len(res) == len(verts)
+
+    return res[::-1]
+
+
+class GridGraph(ImplGraph):
+    def __init__(self, grid):
+        self.grid = grid
+
+    @property
+    def directed(self) -> bool:
+        return False
+
+    def nbors(self, v: T) -> Iterable[tuple[T, Cmp]]:
+        i, j = v
+        for d in range(0, 4):
+            dx, dy = dir_dxy(d)
+            if in_grid(i+dy, j+dx, self.grid):
+                yield (i+dy, j+dx), 1
