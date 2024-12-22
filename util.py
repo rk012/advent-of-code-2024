@@ -532,7 +532,7 @@ def search(g: ImplGraph[T], t: Traversal[T, R, C], start: T, single_visit: bool 
     q = deque([(start, t.start(start))])
     visited = set()
 
-    while q:
+    while q or t.result is not None:
         if t.result is not None:
             return t.result
 
